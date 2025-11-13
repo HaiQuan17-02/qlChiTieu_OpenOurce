@@ -54,6 +54,12 @@ if (isLoggedIn()) {
                             </button>
                         </form>
                         
+                        <div class="text-center mb-3">
+                            <a href="<?= SITE_URL ?>/view/auth/forgot_password.php" class="text-decoration-none">
+                                <i class="bi bi-shield-lock"></i> Quên mật khẩu?
+                            </a>
+                        </div>
+
                         <div class="text-center">
                             <p class="mb-0">
                                 Chưa có tài khoản? 

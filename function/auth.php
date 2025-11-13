@@ -103,6 +103,48 @@ function getCurrentUser() {
     }
 }
 
+// Get user by ID
+function getUserById($userId) {
+    if (empty($userId)) {
+        return null;
+    }
+
+    try {
+        $sql = "SELECT id, username, email, fullname FROM users WHERE id = ?";
+        return queryOne($sql, [$userId]);
+    } catch (Exception $e) {
+        return null;
+    }
+}
+
+// Get user by email
+function getUserByEmail($email) {
+    if (empty($email) || !isValidEmail($email)) {
+        return null;
+    }
+
+    try {
+        $sql = "SELECT id, username, email, fullname FROM users WHERE email = ?";
+        return queryOne($sql, [$email]);
+    } catch (Exception $e) {
+        return null;
+    }
+}
+
+// Get user by email and username
+function getUserByEmailAndUsername($email, $username) {
+    if (empty($email) || empty($username)) {
+        return null;
+    }
+
+    try {
+        $sql = "SELECT id, username, email, fullname FROM users WHERE email = ? AND username = ?";
+        return queryOne($sql, [$email, $username]);
+    } catch (Exception $e) {
+        return null;
+    }
+}
+
 // Check if user exists
 function userExists($username, $email) {
     $sql = "SELECT id FROM users WHERE username = ? OR email = ?";
@@ -155,6 +197,176 @@ function hasPinCode($userId = null) {
         return !empty($user['pin_code']);
     } catch (Exception $e) {
         return false;
+    }
+}
+
+// Tạo token đặt lại mã PIN
+function createPinResetToken($userId) {
+    if (empty($userId)) {
+        return ['success' => false, 'message' => 'Người dùng không hợp lệ'];
+    }
+
+    try {
+        // Xóa token đã dùng hoặc hết hạn
+        execute("DELETE FROM pin_reset_tokens WHERE expires_at < NOW() OR used_at IS NOT NULL");
+        execute("DELETE FROM pin_reset_tokens WHERE user_id = ?", [$userId]);
+
+        $token = bin2hex(random_bytes(32));
+        $expiresAt = date('Y-m-d H:i:s', time() + 3600); // 1 giờ
+
+        $sql = "INSERT INTO pin_reset_tokens (user_id, token, expires_at) VALUES (?, ?, ?)";
+        $result = execute($sql, [$userId, $token, $expiresAt]);
+
+        if ($result['success']) {
+            return [
+                'success' => true,
+                'token' => $token,
+                'expires_at' => $expiresAt
+            ];
+        }
+
+        return ['success' => false, 'message' => 'Không thể tạo token đặt lại PIN'];
+    } catch (Exception $e) {
+        return ['success' => false, 'message' => 'Lỗi: ' . $e->getMessage()];
+    }
+}
+
+// Lấy token đặt lại PIN hợp lệ
+function getValidPinResetToken($token) {
+    if (empty($token)) {
+        return null;
+    }
+
+    try {
+        $sql = "SELECT * FROM pin_reset_tokens WHERE token = ? LIMIT 1";
+        $record = queryOne($sql, [$token]);
+
+        if (!$record) {
+            return null;
+        }
+
+        if (!empty($record['used_at'])) {
+            return null;
+        }
+
+        if (strtotime($record['expires_at']) < time()) {
+            return null;
+        }
+
+        return $record;
+    } catch (Exception $e) {
+        return null;
+    }
+}
+
+// Đặt lại mã PIN bằng token
+function resetPinWithToken($token, $newPin) {
+    if (empty($token) || empty($newPin)) {
+        return ['success' => false, 'message' => 'Thiếu thông tin cần thiết'];
+    }
+
+    $tokenRecord = getValidPinResetToken($token);
+    if (!$tokenRecord) {
+        return ['success' => false, 'message' => 'Token không hợp lệ hoặc đã hết hạn'];
+    }
+
+    $updateResult = setPinCode($newPin, $tokenRecord['user_id']);
+    if (!$updateResult['success']) {
+        return $updateResult;
+    }
+
+    execute("UPDATE pin_reset_tokens SET used_at = NOW() WHERE id = ?", [$tokenRecord['id']]);
+
+    return ['success' => true, 'message' => 'Đặt lại mã PIN thành công'];
+}
+
+// Tạo token đặt lại mật khẩu
+function createPasswordResetToken($userId) {
+    if (empty($userId)) {
+        return ['success' => false, 'message' => 'Người dùng không hợp lệ'];
+    }
+
+    try {
+        execute("DELETE FROM password_reset_tokens WHERE expires_at < NOW() OR used_at IS NOT NULL");
+        execute("DELETE FROM password_reset_tokens WHERE user_id = ?", [$userId]);
+
+        $token = bin2hex(random_bytes(32));
+        $expiresAt = date('Y-m-d H:i:s', time() + 3600);
+
+        $sql = "INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES (?, ?, ?)";
+        $result = execute($sql, [$userId, $token, $expiresAt]);
+
+        if ($result['success']) {
+            return [
+                'success' => true,
+                'token' => $token,
+                'expires_at' => $expiresAt
+            ];
+        }
+
+        return ['success' => false, 'message' => 'Không thể tạo token đặt lại mật khẩu'];
+    } catch (Exception $e) {
+        return ['success' => false, 'message' => 'Lỗi: ' . $e->getMessage()];
+    }
+}
+
+// Lấy token đặt lại mật khẩu hợp lệ
+function getValidPasswordResetToken($token) {
+    if (empty($token)) {
+        return null;
+    }
+
+    try {
+        $sql = "SELECT * FROM password_reset_tokens WHERE token = ? LIMIT 1";
+        $record = queryOne($sql, [$token]);
+
+        if (!$record) {
+            return null;
+        }
+
+        if (!empty($record['used_at'])) {
+            return null;
+        }
+
+        if (strtotime($record['expires_at']) < time()) {
+            return null;
+        }
+
+        return $record;
+    } catch (Exception $e) {
+        return null;
+    }
+}
+
+// Đặt lại mật khẩu bằng token
+function resetPasswordWithToken($token, $newPassword) {
+    if (empty($token) || empty($newPassword)) {
+        return ['success' => false, 'message' => 'Thiếu thông tin cần thiết'];
+    }
+
+    if (!isValidPassword($newPassword)) {
+        return ['success' => false, 'message' => 'Mật khẩu phải có ít nhất 6 ký tự'];
+    }
+
+    $tokenRecord = getValidPasswordResetToken($token);
+    if (!$tokenRecord) {
+        return ['success' => false, 'message' => 'Token không hợp lệ hoặc đã hết hạn'];
+    }
+
+    try {
+        $hashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
+        $sql = "UPDATE users SET password = ? WHERE id = ?";
+        $result = execute($sql, [$hashedPassword, $tokenRecord['user_id']]);
+
+        if (!$result['success']) {
+            return ['success' => false, 'message' => 'Không thể cập nhật mật khẩu'];
+        }
+
+        execute("UPDATE password_reset_tokens SET used_at = NOW() WHERE id = ?", [$tokenRecord['id']]);
+
+        return ['success' => true, 'message' => 'Đặt lại mật khẩu thành công'];
+    } catch (Exception $e) {
+        return ['success' => false, 'message' => 'Lỗi: ' . $e->getMessage()];
     }
 }
 ?>

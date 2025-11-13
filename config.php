@@ -5,6 +5,12 @@
 define('SITE_NAME', 'Quản Lý Chi Tiêu');
 define('SITE_URL', 'http://localhost/quanLyChiTieu');
 
+// Mail configuration (override via environment variables if available)
+  // config.php
+  define('MAIL_FROM_ADDRESS', getenv('MAIL_FROM_ADDRESS') ?: 'haiquan1911@gmail.com');
+  define('MAIL_FROM_NAME', getenv('MAIL_FROM_NAME') ?: 'Quản Lý Chi Tiêu');
+define('MAIL_RETURN_PATH', getenv('MAIL_RETURN_PATH') ?: MAIL_FROM_ADDRESS);
+
 // Session configuration
 ini_set('session.cookie_httponly', 1);
 ini_set('session.use_only_cookies', 1);

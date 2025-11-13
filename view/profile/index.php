@@ -80,6 +80,11 @@ if (!$user) {
                                     <?php endif; ?>
                                 </div>
                             </div>
+                            <div class="mt-3">
+                                <a href="<?= SITE_URL ?>/view/auth/forgot_pin.php" class="btn btn-outline-primary btn-sm">
+                                    <i class="bi bi-shield-lock"></i> Quên mã PIN?
+                                </a>
+                            </div>
                         </div>
                     </div>
                 </div>
